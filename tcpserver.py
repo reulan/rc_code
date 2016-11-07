@@ -7,15 +7,36 @@ mpmsimo
 
 import socketserver
 import logging
+import logging.handlers
 
 # Can be moved to a config file later
 host = 'localhost'
 port = '4000'
-logfile = 'tcpserver.log'
+logfile = 'server.log'
+
+# Dict with host/port vars to pass to string
+s = {'host': host, 'port': port}
+
+# Create logging format
+FORMAT = '%(asctime)s %(threadName)s %(levelname)s %(message)s in %(module)s on line %(lineno)d'
+
+# Create handler for TCP server
+class RCServer(socketserver.TCPServer):
+
+    def __init__(self, host, handler_class=RCRequestHandler,):
+        self.logger.get
+    logging.basicConfig(format=FORMAT)
+
+    # Create logger object and set min logging level
+    logger = logging.getLogger('tcps-logger')
+    logger.setLevel(logging.DEBUG)
+
+    handler = logging.handlers.RotatingFileHandler(logfile, maxBytes=100, backupCount=10,)
+    logger.addHandler(handler)
+    #logger.warning('Protocol problem: %s', 'connection reset', extra=s)
 
 class MyTCPHandler(socketserver.BaseRequestHandler):
-    """A basic implementation of a TCP RequestHandler, from the BaseServer
-template."""
+    """A basic implementation of a TCP RequestHandler, from the BaseServer template."""
 
     def handle(self):
         """Handles a request sent to the server."""
@@ -28,17 +49,7 @@ template."""
 
 if __name__ == "__main__":
     # Create log files up to 10MB (with backup of prior logs) then rotate the file
-    handler = logging.handlers.RotatingFileHandler(logfile, maxBytes=10240, backupCount=10)
-    handler.setLevel(logging.WARNING)
 
-    # File logging timestamp (flask default)
-    handler.setFormatter(logging.Formatter(
-    '%(asctime)s %(levelname)s: %(message)s '
-    '[in %(pathname)s:%(lineno)d]'))
-
-    app.logger.addHandler(handler)
-    app.logger.warning('WARNING test')
-    app.logger.error('ERROR test')
 
     # Start the server
     server = socketserver.TCPServer((host, port), MyTCPHandler)
