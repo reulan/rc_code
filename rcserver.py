@@ -5,6 +5,59 @@ mpmsimo
 11/10/2016
 """
 
+from http.server import BaseHTTPRequestHandler
+from http.server import HTTPServer
+import logging
+import logging.handlers
+
+# Can be moved to a config file later
+host = '127.0.0.1'
+#host = 'localhost'
+port = 4000
+logfile = 'server.log'
+
+# Dict with host/port vars to pass to string
+s = {'host': host, 'port': port}
+
+# Create logging format
+FORMAT = '%(asctime)s %(threadName)s %(levelname)s %(message)s in %(module)s on line %(lineno)d'
+
+# Create handler for TCP server
+logging.basicConfig(level=logging.DEBUG, format=FORMAT)
+
+# HTTP Server
+class HTTPReqHandler(BaseHTTPRequestHandler):
+    """Handler for GET HTTP(S) requests."""
+
+    def do_GET(self):
+        """Print what the client sees during GET requests."""
+        message_parts = ['']
+
+        for name, value in sorted(self.headers.items()):
+            print(name, value)
+            # Print headers to STDOUT
+            message_parts.append('{}={}'.format(name, value.rstrip()))
+
+
+        # Return a 200, letting the client know everything is OK.
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/plain; charset=utf-8')
+        self.end_headers()
+
+    def do_POST(self):
+        """Update a key/value pair."""
+
+def start_server(host, port):
+    """Starts the HTTP server."""
+    server = HTTPServer((host, port), HTTPReqHandler)
+    print('HTTP server has started on [{h}:{p}].'.format(h=host,p=port))
+    server.serve_forever()
+
+if __name__ == '__main__':
+    start_server(host, port)
+
+# TCP Server
+'''
 import socketserver
 import logging
 import logging.handlers
@@ -142,3 +195,4 @@ if __name__ == '__main__':
     s.close()
     logger.debug('done')
     server.socket.close()
+'''
