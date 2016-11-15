@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler
 from http.server import HTTPServer
 import logging
 import logging.handlers
+import urllib.parse
 
 # Can be moved to a config file later
 host = '127.0.0.1'
@@ -31,13 +32,24 @@ class HTTPReqHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         """Print what the client sees during GET requests."""
-        message_parts = ['']
+        # Extract values for URL 
+        ulpup = urllib.parse.urlparse(self.path)
 
-        for name, value in sorted(self.headers.items()):
-            print(name, value)
-            # Print headers to STDOUT
-            message_parts.append('{}={}'.format(name, value.rstrip()))
+        # Get key/value
+        value_list = ulpup.query.split('=')
+        query_key = value_list[0]
+        query_value = value_list[1]
 
+        # Set message
+        get_output = 'The value associated with the key \'{k}\' is {v}.\n'.format(k=query_key, v=query_value)
+        self.wfile.write(get_output.encode('utf-8'))
+
+        # Check JSON file for key/value pairing
+        #get_output.append('{0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10}'.format(self.client_address, self.server, self.command, self.path, self.request_version, self.rfile, self.wfile, self.protocol_version, self.MessageClass, self.responses, self.error_message_format))
+        #get_output.append('{k}, {v}'.format(k=self.headers.keys(), v=self.headers.values()))
+
+
+        # Return key
 
         # Return a 200, letting the client know everything is OK.
         self.send_response(200)
@@ -46,6 +58,10 @@ class HTTPReqHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         """Update a key/value pair."""
+        # What is POST vs SET
+        # Get header URL
+        # Check if key exists, overwrite value
+        pass
 
 def start_server(host, port):
     """Starts the HTTP server."""
@@ -55,144 +71,3 @@ def start_server(host, port):
 
 if __name__ == '__main__':
     start_server(host, port)
-
-# TCP Server
-'''
-import socketserver
-import logging
-import logging.handlers
-
-# Can be moved to a config file later
-#host = 'localhost'
-host = '127.0.0.1'
-port = 4000
-logfile = 'server.log'
-
-# Dict with host/port vars to pass to string
-s = {'host': host, 'port': port}
-
-# Create logging format
-FORMAT = '%(asctime)s %(threadName)s %(levelname)s %(message)s in %(module)s on line %(lineno)d'
-
-# Create handler for TCP server
-logging.basicConfig(level=logging.DEBUG, format=FORMAT,)
-import logging
-import sys
-import socketserver
-
-class EchoRequestHandler(socketserver.BaseRequestHandler):
-
-    def __init__(self, request, client_address, server):
-        self.logger = logging.getLogger('EchoRequestHandler')
-        self.logger.debug('__init__')
-        socketserver.BaseRequestHandler.__init__(self, request, client_address, server)
-        return
-
-    def setup(self):
-        self.logger.debug('setup')
-        return socketserver.BaseRequestHandler.setup(self)
-
-    def handle(self):
-        self.logger.debug('handle')
-
-        # Echo the back to the client
-        data = self.request.recv(1024)
-        self.logger.debug('recv()->"%s"', data)
-        self.request.send(data)
-        return
-
-    def finish(self):
-        self.logger.debug('finish')
-        return socketserver.BaseRequestHandler.finish(self)
-
-class EchoServer(socketserver.TCPServer):
-
-    def __init__(self, server_address,
-                 handler_class=EchoRequestHandler,
-                 ):
-        self.logger = logging.getLogger('EchoServer')
-        self.logger.debug('__init__')
-        socketserver.TCPServer.__init__(self, server_address, handler_class)
-        return
-
-    def server_activate(self):
-        self.logger.debug('server_activate')
-        socketserver.TCPServer.server_activate(self)
-        return
-
-    def serve_forever(self, poll_interval=0.5):
-        self.logger.debug('waiting for request')
-        self.logger.info('Handling requests, press <Ctrl-C> to quit')
-        socketserver.TCPServer.serve_forever(self, poll_interval)
-        return
-
-    def handle_request(self):
-        self.logger.debug('handle_request')
-        return socketserver.TCPServer.handle_request(self)
-
-    def verify_request(self, request, client_address):
-        self.logger.debug('verify_request(%s, %s)',
-                          request, client_address)
-        return socketserver.TCPServer.verify_request(self, request, client_address,)
-
-    def process_request(self, request, client_address):
-        self.logger.debug('process_request(%s, %s)',
-                          request, client_address)
-        return socketserver.TCPServer.process_request(self, request, client_address,)
-
-    def server_close(self):
-        self.logger.debug('server_close')
-        return socketserver.TCPServer.server_close(self)
-
-    def finish_request(self, request, client_address):
-        self.logger.debug('finish_request(%s, %s)',
-                          request, client_address)
-        return socketserver.TCPServer.finish_request(self, request, client_address,)
-
-    def close_request(self, request_address):
-        self.logger.debug('close_request(%s)', request_address)
-        return socketserver.TCPServer.close_request(self, request_address,)
-
-    def shutdown(self):
-        self.logger.debug('shutdown()')
-        return socketserver.TCPServer.shutdown(self)
-
-if __name__ == '__main__':
-    import socket
-    import threading
-
-    address = (host, port)
-    server = EchoServer(address, EchoRequestHandler)
-    ip, port = server.server_address  # what port was assigned?
-
-    # Start the server in a thread
-    t = threading.Thread(target=server.serve_forever)
-    t.setDaemon(True)  # don't hang on exit
-    t.start()
-
-    logger = logging.getLogger('client')
-    logger.info('Server on %s:%s', ip, port)
-
-    # Connect to the server
-    logger.debug('creating socket')
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    logger.debug('connecting to server')
-    s.connect((ip, port))
-
-    # Send the data
-    message = 'Hello, world'.encode()
-    logger.debug('sending data: %r', message)
-    len_sent = s.send(message)
-
-    # Receive a response
-    logger.debug('waiting for response')
-    response = s.recv(len_sent)
-    logger.debug('response from server: %r', response)
-
-    # Clean up
-    server.shutdown()
-    logger.debug('closing socket')
-    s.close()
-    logger.debug('done')
-    server.socket.close()
-'''
