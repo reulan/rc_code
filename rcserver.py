@@ -10,6 +10,7 @@ from http.server import HTTPServer
 import logging
 import logging.handlers
 import urllib.parse
+import sqlite3
 
 # Can be moved to a config file later
 host = '127.0.0.1'
@@ -23,8 +24,13 @@ s = {'host': host, 'port': port}
 # Create logging format
 FORMAT = '%(asctime)s %(threadName)s %(levelname)s %(message)s in %(module)s on line %(lineno)d'
 
-# Create handler for TCP server
+# Create logging handler for application
 logging.basicConfig(level=logging.DEBUG, format=FORMAT)
+
+# In-memory database
+conn = sqlite3.connect(':memory:')
+c = conn.cursor()
+
 
 # HTTP Server
 class HTTPReqHandler(BaseHTTPRequestHandler):
@@ -40,6 +46,9 @@ class HTTPReqHandler(BaseHTTPRequestHandler):
         query_key = value_list[0]
         query_value = value_list[1]
 
+        # Key lookup
+        
+
         # Set message
         get_output = 'The value associated with the key \'{k}\' is {v}.\n'.format(k=query_key, v=query_value)
         self.wfile.write(get_output.encode('utf-8'))
@@ -47,9 +56,6 @@ class HTTPReqHandler(BaseHTTPRequestHandler):
         # Check JSON file for key/value pairing
         #get_output.append('{0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10}'.format(self.client_address, self.server, self.command, self.path, self.request_version, self.rfile, self.wfile, self.protocol_version, self.MessageClass, self.responses, self.error_message_format))
         #get_output.append('{k}, {v}'.format(k=self.headers.keys(), v=self.headers.values()))
-
-
-        # Return key
 
         # Return a 200, letting the client know everything is OK.
         self.send_response(200)
