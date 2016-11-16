@@ -5,73 +5,116 @@ mpmsimo
 11/10/2016
 """
 
-from http.server import BaseHTTPRequestHandler
-from http.server import HTTPServer
+import http.server
 import logging
 import logging.handlers
 import urllib.parse
+import urllib.request
 import sqlite3
 
 # Can be moved to a config file later
 host = '127.0.0.1'
-#host = 'localhost'
 port = 4000
 logfile = 'server.log'
 
-# Dict with host/port vars to pass to string
-s = {'host': host, 'port': port}
-
 # Create logging format
 FORMAT = '%(asctime)s %(threadName)s %(levelname)s %(message)s in %(module)s on line %(lineno)d'
-
 # Create logging handler for application
 logging.basicConfig(level=logging.DEBUG, format=FORMAT)
 
 # In-memory database
-conn = sqlite3.connect(':memory:')
-c = conn.cursor()
+dbc = sqlite3.connect(':memory:')
 
+# Handle closing of connection when shutdown.
+with dbc:
+    cursor = dbc.cursor()
+    # Create table that will store key/values.
+    cursor.execute('CREATE TABLE items(key TEXT PRIMARY KEY, value TEXT);')
 
 # HTTP Server
-class HTTPReqHandler(BaseHTTPRequestHandler):
+class HTTPReqHandler(http.server.BaseHTTPRequestHandler):
     """Handler for GET HTTP(S) requests."""
+
+    logger = logging.getLogger('httplog')
+    logger.setLevel(logging.DEBUG)
+    handler = logging.handlers.RotatingFileHandler(logfile, maxBytes=100, backupCount=10,)
+    logger.addHandler(handler)
 
     def do_GET(self):
         """Print what the client sees during GET requests."""
         # Extract values for URL 
         ulpup = urllib.parse.urlparse(self.path)
+        self.logger.debug(str(self.path[:5]))
 
-        # Get key/value
-        value_list = ulpup.query.split('=')
-        query_key = value_list[0]
-        query_value = value_list[1]
+        # Huge Hack :(
+        if str(self.path[:5]) == '/set?':
+            get_output = 'Redirecting to SET/POST API call.'
+            self.logger.warning(get_output)
+            self.wfile.write(get_output.encode('utf-8'))
+            self.send_response(307)
+            self.send_header('Content-Type', 'text/plain; charset=utf-8')
+            self.end_headers()
+            self.do_POST()
+        else:
+            # Get value from header
+            value_list = ulpup.query.split('=')
+            query_key = value_list[1]
 
-        # Key lookup
-        
+            # Value lookup based on key provided in header.
+            ce = cursor.execute("SELECT value FROM items WHERE key='{k}';".format(k=query_key))
 
-        # Set message
-        get_output = 'The value associated with the key \'{k}\' is {v}.\n'.format(k=query_key, v=query_value)
-        self.wfile.write(get_output.encode('utf-8'))
+            # Format value, slice off excess punctuation
+            return_value = str(ce.fetchone())[2:-3]
+            if return_value in [None, '']:
+                get_output = "Key '{k}' does not exist.\n".format(k=query_key)
+            else:
+                get_output = 'dblookup for {k}: {v}\n'.format(k=query_key, v=return_value)
 
-        # Check JSON file for key/value pairing
-        #get_output.append('{0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10}'.format(self.client_address, self.server, self.command, self.path, self.request_version, self.rfile, self.wfile, self.protocol_version, self.MessageClass, self.responses, self.error_message_format))
-        #get_output.append('{k}, {v}'.format(k=self.headers.keys(), v=self.headers.values()))
+            # Send to client
+            self.wfile.write(get_output.encode('utf-8'))
 
-        # Return a 200, letting the client know everything is OK.
-        self.send_response(200)
-        self.send_header('Content-Type', 'text/plain; charset=utf-8')
-        self.end_headers()
+            # Return a 200, letting the client know everything is OK.
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/plain; charset=utf-8')
+            self.end_headers()
 
     def do_POST(self):
         """Update a key/value pair."""
-        # What is POST vs SET
         # Get header URL
-        # Check if key exists, overwrite value
-        pass
+        ulpup = urllib.parse.urlparse(self.path)
 
+        # Get key/value from header
+        value_list = ulpup.query.split('=')
+        query_key = value_list[0]
+        self.logger.debug(value_list)
+        try:
+            query_value = value_list[1]
+        except IndexError as ie:
+            self.logger.warning(ie)
+            query_value = ''
+
+        # Check if key exists, overwrite value
+        #ce = cursor.execute("SELECT value FROM items WHERE key='{k}';".format(k=query_key))
+        #self.logger.debug(str(ce.fetchone()))
+        #if str(ce.fetchone())[2:-3] not in [None, '']:
+
+        try:
+            cursor.execute("INSERT INTO items(key, value) VALUES ('{k}', '{v}');".format(k=query_key, v=query_value))
+        except sqlite3.IntegrityError as sie:
+            self.logger.error(sie)
+
+        get_output = 'Added {k} = {v} to database.'.format(k=query_key, v=query_value)
+'''
+        self.logger.info(get_output)
+        self.wfile.write(get_output.encode('utf-8'))
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/plain; charset=utf-8')
+        self.end_headers()
+'''
 def start_server(host, port):
     """Starts the HTTP server."""
-    server = HTTPServer((host, port), HTTPReqHandler)
+
+    server = http.server.HTTPServer((host, port), HTTPReqHandler)
     print('HTTP server has started on [{h}:{p}].'.format(h=host,p=port))
     server.serve_forever()
 
